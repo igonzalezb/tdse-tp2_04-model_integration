@@ -61,7 +61,7 @@
 
 /********************** internal data declaration ****************************/
 task_system_dta_t task_system_dta =
-	{DEL_SYS_MIN, ST_SYS_IDLE, EV_SYS_IDLE, false};
+{ DEL_SYS_MIN, ST_SYS_IDLE, EV_SYS_IDLE, false };
 
 #define SYSTEM_DTA_QTY	(sizeof(task_system_dta)/sizeof(task_system_dta_t))
 
@@ -69,8 +69,8 @@ task_system_dta_t task_system_dta =
 void task_system_statechart(void);
 
 /********************** internal data definition *****************************/
-const char *p_task_system 		= "Task System (System Statechart)";
-const char *p_task_system_ 		= "Non-Blocking & Update By Time Code";
+const char *p_task_system = "Task System (System Statechart)";
+const char *p_task_system_ = "Non-Blocking & Update By Time Code";
 
 /********************** external data declaration ****************************/
 uint32_t g_task_system_cnt;
@@ -79,14 +79,15 @@ volatile uint32_t g_task_system_tick_cnt;
 /********************** external functions definition ************************/
 void task_system_init(void *parameters)
 {
-	task_system_dta_t 	*p_task_system_dta;
-	task_system_st_t	state;
-	task_system_ev_t	event;
+	task_system_dta_t *p_task_system_dta;
+	task_system_st_t state;
+	task_system_ev_t event;
 	bool b_event;
 
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
-	LOGGER_INFO("  %s is running - %s", GET_NAME(task_system_init), p_task_system);
+	LOGGER_INFO("  %s is running - %s", GET_NAME(task_system_init),
+			p_task_system);
 	LOGGER_INFO("  %s is a %s", GET_NAME(task_system), p_task_system_);
 
 	/* Init & Print out: Task execution counter */
@@ -109,10 +110,9 @@ void task_system_init(void *parameters)
 	p_task_system_dta->flag = b_event;
 
 	LOGGER_INFO(" ");
-	LOGGER_INFO("   %s = %lu   %s = %lu   %s = %s",
-				 GET_NAME(state), (uint32_t)state,
-				 GET_NAME(event), (uint32_t)event,
-				 GET_NAME(b_event), (b_event ? "true" : "false"));
+	LOGGER_INFO("   %s = %lu   %s = %lu   %s = %s", GET_NAME(state),
+			(uint32_t )state, GET_NAME(event), (uint32_t )event,
+			GET_NAME(b_event), (b_event ? "true" : "false"));
 }
 
 void task_system_update(void *parameters)
@@ -120,25 +120,28 @@ void task_system_update(void *parameters)
 	bool b_time_update_required = false;
 
 	/* Protect shared resource */
-	__asm("CPSID i");	/* disable interrupts */
-    if (G_TASK_SYS_TICK_CNT_INI < g_task_system_tick_cnt)
-    {
+	__asm("CPSID i");
+	/* disable interrupts */
+	if (G_TASK_SYS_TICK_CNT_INI < g_task_system_tick_cnt)
+	{
 		/* Update Tick Counter */
-    	g_task_system_tick_cnt--;
-    	b_time_update_required = true;
-    }
-    __asm("CPSIE i");	/* enable interrupts */
+		g_task_system_tick_cnt--;
+		b_time_update_required = true;
+	}
+	__asm("CPSIE i");
+	/* enable interrupts */
 
-    while (b_time_update_required)
-    {
+	while (b_time_update_required)
+	{
 		/* Update Task Counter */
 		g_task_system_cnt++;
 
 		/* Run Task Statechart */
-    	task_system_statechart();
+		task_system_statechart();
 
-    	/* Protect shared resource */
-		__asm("CPSID i");	/* disable interrupts */
+		/* Protect shared resource */
+		__asm("CPSID i");
+		/* disable interrupts */
 		if (G_TASK_SYS_TICK_CNT_INI < g_task_system_tick_cnt)
 		{
 			/* Update Tick Counter */
@@ -149,8 +152,9 @@ void task_system_update(void *parameters)
 		{
 			b_time_update_required = false;
 		}
-		__asm("CPSIE i");	/* enable interrupts */
-    }
+		__asm("CPSIE i");
+		/* enable interrupts */
+	}
 }
 
 void task_system_statechart(void)
@@ -166,92 +170,98 @@ void task_system_statechart(void)
 		p_task_system_dta->event = get_event_task_system();
 	}
 
-	if(p_task_system_dta->flag == true)
+	switch (p_task_system_dta->state)
 	{
-		switch (p_task_system_dta->state)
+	case ST_SYS_IDLE:
+
+		if ((p_task_system_dta->flag == true)
+				&& (EV_SYS_LOOP_DET == p_task_system_dta->event))
 		{
-			case ST_SYS_IDLE:
-
-				if (EV_SYS_LOOP_DET == p_task_system_dta->event)
-				{
-					p_task_system_dta->state = ST_SYS_ACTIVE_01;
-				}
-
-				break;
-
-			case ST_SYS_ACTIVE_01:
-
-				if (EV_SYS_MANUAL_BTN == p_task_system_dta->event)
-				{
-					put_event_task_actuator(EV_LED_XX_BLINK, ID_LED_A);
-					p_task_system_dta->state = ST_SYS_ACTIVE_02;
-					p_task_system_dta->tick = DEL_SYS_MAX;
-				}
-
-				break;
-			case ST_SYS_ACTIVE_02:
-				if (p_task_system_dta->tick == 0 )
-				{
-					put_event_task_actuator(EV_LED_XX_ON, ID_LED_A);
-					p_task_system_dta->state = ST_SYS_ACTIVE_03;
-				}
-				else if (p_task_system_dta->tick > 0)
-				{
-					p_task_system_dta->tick--;
-				}
-
-				break;
-
-			case ST_SYS_ACTIVE_03:
-				if (EV_SYS_NOT_LOOP_DET == p_task_system_dta->event)
-				{
-					p_task_system_dta->state = ST_SYS_ACTIVE_04;
-				}
-
-				break;
-
-			case ST_SYS_ACTIVE_04:
-				if (EV_SYS_IR_PHO_CELL == p_task_system_dta->event)
-				{
-					p_task_system_dta->state = ST_SYS_ACTIVE_05;
-				}
-
-				break;
-
-			case ST_SYS_ACTIVE_05:
-				if (EV_SYS_NOT_IR_PHO_CELL == p_task_system_dta->event)
-				{
-					p_task_system_dta->state = ST_SYS_ACTIVE_06;
-					p_task_system_dta->tick = DEL_SYS_MAX;
-					put_event_task_actuator(EV_LED_XX_BLINK, ID_LED_A);
-				}
-
-				break;
-
-			case ST_SYS_ACTIVE_06:
-				if (p_task_system_dta->tick == 0 )
-				{
-					put_event_task_actuator(EV_LED_XX_OFF, ID_LED_A);
-					p_task_system_dta->state = ST_SYS_IDLE;
-				}
-				else if (p_task_system_dta->tick > 0)
-				{
-					p_task_system_dta->tick--;
-				}
-
-				break;
-
-			default:
-
-				p_task_system_dta->tick  = DEL_SYS_MIN;
-				p_task_system_dta->state = ST_SYS_IDLE;
-				p_task_system_dta->event = EV_SYS_IDLE;
-
-				break;
+			p_task_system_dta->state = ST_SYS_ACTIVE_01;
+			p_task_system_dta->flag = false;
 		}
 
-		p_task_system_dta->flag = false;
+		break;
+
+	case ST_SYS_ACTIVE_01:
+
+		if ((p_task_system_dta->flag == true)
+				&& (EV_SYS_MANUAL_BTN == p_task_system_dta->event))
+		{
+			put_event_task_actuator(EV_LED_XX_BLINK, ID_LED_A);
+			p_task_system_dta->state = ST_SYS_ACTIVE_02;
+			p_task_system_dta->tick = DEL_SYS_MAX;
+			p_task_system_dta->flag = false;
+		}
+
+		break;
+	case ST_SYS_ACTIVE_02:
+		if ((p_task_system_dta->tick == 0))
+		{
+			put_event_task_actuator(EV_LED_XX_ON, ID_LED_A);
+			p_task_system_dta->state = ST_SYS_ACTIVE_03;
+		}
+		else if (p_task_system_dta->tick > 0)
+		{
+			p_task_system_dta->tick--;
+		}
+
+		break;
+
+	case ST_SYS_ACTIVE_03:
+		if ((p_task_system_dta->flag == true)
+				&& (EV_SYS_NOT_LOOP_DET == p_task_system_dta->event))
+		{
+			p_task_system_dta->state = ST_SYS_ACTIVE_04;
+			p_task_system_dta->flag = false;
+		}
+
+		break;
+
+	case ST_SYS_ACTIVE_04:
+		if ((p_task_system_dta->flag == true)
+				&& (EV_SYS_IR_PHO_CELL == p_task_system_dta->event))
+		{
+			p_task_system_dta->state = ST_SYS_ACTIVE_05;
+			p_task_system_dta->flag = false;
+		}
+
+		break;
+
+	case ST_SYS_ACTIVE_05:
+		if ((p_task_system_dta->flag == true)
+				&& (EV_SYS_NOT_IR_PHO_CELL == p_task_system_dta->event))
+		{
+			p_task_system_dta->state = ST_SYS_ACTIVE_06;
+			p_task_system_dta->tick = DEL_SYS_MAX;
+			put_event_task_actuator(EV_LED_XX_BLINK, ID_LED_A);
+			p_task_system_dta->flag = false;
+		}
+
+		break;
+
+	case ST_SYS_ACTIVE_06:
+		if ((p_task_system_dta->tick == 0))
+		{
+			put_event_task_actuator(EV_LED_XX_OFF, ID_LED_A);
+			p_task_system_dta->state = ST_SYS_IDLE;
+		}
+		else if ((p_task_system_dta->tick > 0))
+		{
+			p_task_system_dta->tick--;
+		}
+
+		break;
+
+	default:
+
+		p_task_system_dta->tick = DEL_SYS_MIN;
+		p_task_system_dta->state = ST_SYS_IDLE;
+		p_task_system_dta->event = EV_SYS_IDLE;
+
+		break;
 	}
+
 }
 
 /********************** end of file ******************************************/
